@@ -79,25 +79,30 @@ char* nextToken(char* input) {
 
 void addTask(char* input) {
     Task task;
-    int duration, i = ZERO, j = ZERO;
+    int duration, i = ZERO;
     char description[TASK_DESCRIPTION];
-    char* token, c;
+    char* token;
 
     token = nextToken(input);
     if(strlen(token) == ZERO || isNumerical(token) == FALSE) {
         ERROR("invalid duration");
     }
     duration = atoi(token);
+
+    description[ZERO] = NULL_CHARACTER;
+    while(strlen(token = nextToken(input)) != ZERO) {
+        strcat(description, token);
+        i += strlen(token);
+        description[i++] = WHITESPACE;
+        description[i] = NULL_CHARACTER;
+    }
     free(token);
 
-    while(strlen(token = nextToken(input)) != ZERO) {
-        while((c = token[j++]) != NULL_CHARACTER)
-            description[i++] = c;
-        description[i++] = WHITESPACE;
-        j = ZERO;
+    for(i = ZERO; i < task_count; i++) {
+        if(strcmp(manager.tasks[i].description, description) == ZERO) {
+            ERROR("duplicate description");
+        }
     }
-    description[i] = NULL_CHARACTER;
-    free(token);
 
     if(task_count == TASK_MAX) {
         ERROR("too many tasks");
@@ -116,7 +121,7 @@ void addTask(char* input) {
 
 void printTasks(int* ids, int id_count) {
     Task task;
-    int i = 0;
+    int i = ZERO;
 
     if(id_count == ZERO) {
         /*TODO: IMPLEMENT SORTING*/
@@ -147,6 +152,8 @@ void listTasks(char* input) {
         }
         printTasks(ids, i);
     }
+    free(token);
+    free(ids);
 }
 
 void clockStep(char* input) {
@@ -162,36 +169,52 @@ void clockStep(char* input) {
     printf("%d", manager.clock);
 }
 
-void addUser(char* input) {
-    User task;
-    int duration, i = ZERO, j = ZERO;
-    char name[USER_NAME];
-    char* token, c;
+void printAllUsers() {
+    int i;
 
-    while(strlen(token = nextToken(input)) != ZERO) {
-        while((c = token[j++]) != NULL_CHARACTER)
-            name[i++] = c;
-        name[i++] = WHITESPACE;
-        j = ZERO;
+    for(i = ZERO; i < user_count; i++)
+        printf("%s\n", manager.users[i].name);
+}
+
+void addUser(char* input) {
+    User user;
+    int i = ZERO;
+    char name[USER_NAME];
+    char* token;
+
+    if(strlen(input) == ZERO) {
+        printAllUsers();
+        return;
     }
-    name[i] = NULL_CHARACTER;
+
+    name[ZERO] = NULL_CHARACTER;
+    while(strlen(token = nextToken(input)) != ZERO) {
+        strcat(name, token);
+        i += strlen(token);
+        name[i++] = WHITESPACE;
+        name[i] = NULL_CHARACTER;
+    }
+
+    for(i = ZERO; i < user_count; i++) {
+        if(strcmp(manager.users[i].name, name) == ZERO) {
+            ERROR("user already exists");
+        }
+    }
     free(token);
 
-    if(task_count == TASK_MAX) {
-        ERROR("too many tasks");
+    if(user_count == USER_MAX) {
+        ERROR("too many users");
     }
 
-    strcpy(task.description, description);
+    strcpy(user.name, name);
 
-    printf("task %d", task.id);
-
-    manager.tasks[task_count++] = task;
+    manager.users[user_count++] = user;
 }
 
 int parseInput(char* input) {
     Command command;
     fgets(input, COMMAND_SIZE, stdin);
-    command = nextToken(input)[0];
+    command = nextToken(input)[ZERO];
 
     switch(command){
         case Q:
@@ -227,5 +250,5 @@ int main() {
     while(parseInput(input) != QUIT)
         putchar(NEW_LINE);
     
-    return 0;
+    return ZERO;
 }
