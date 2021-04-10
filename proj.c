@@ -145,7 +145,6 @@ void printTasks(int* ids, int id_count) {
     }
 }
 
-
 /*
 printAllUsers: ->
     prints all registered users
@@ -212,6 +211,35 @@ int taskExists(int id) {
         if(manager.tasks[i].id == id)
             return TRUE;
     return FALSE;
+}
+
+void merge(int unsorted[], int tmp[], int left, int middle, int right) {
+    int i = left, j = middle, k = ZERO;
+    
+    while(i < middle && j <= right)
+        tmp[k++] = unsorted[i] < unsorted[j] ? unsorted[i++] : unsorted[j++];
+    
+    if(i == middle)
+        while(j <= right)
+            tmp[k++] = unsorted[j++];
+    else
+        while(i < middle)
+            tmp[k++] = unsorted[i++];
+
+    for(k = left; k <= right; k++)
+        unsorted[k] = tmp[k - left];
+}
+
+void mergeSort(int unsorted[], int tmp[], int left, int right) {
+    int middle = (left + right) / 2;
+
+    if(right <= left)
+        return;
+
+    mergeSort(unsorted, tmp, left, middle);
+    mergeSort(unsorted, tmp, middle + 1, right);
+
+    merge(unsorted, tmp, left, middle + 1, right);
 }
 
 
@@ -496,9 +524,15 @@ main: -> int
     finalizes when user enters the QUIT command
 */
 int main() {
-    init(); 
+    int i = 0;
+    int array[30] = {1, 3, 5, 7, 9, 2, 4, 6, 8, 10, 1, 42, 199, 41, 4, 3, 6, 10 , 19, 20, 21, 22, 23, 24, 66, 53, 713, 512, 57, 12};
+    int tmp[30];
+    mergeSort(array, tmp, 0, 29);
+    while(i < 30)
+        printf("%d\n", array[i++]);
+    /*init(); 
     while(parseInput() != QUIT)
-        ;
+        ;*/
     
     return ZERO;
 }
