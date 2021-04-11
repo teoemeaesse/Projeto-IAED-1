@@ -125,6 +125,92 @@ char* nextToken(char* input) {
     return token;
 }
 
+void merge(int unsorted[], int tmp[], int left, int middle, int right) {
+    int i = left, j = middle, k = ZERO;
+    
+    while(i < middle && j <= right)
+        tmp[k++] = unsorted[i] < unsorted[j] ? unsorted[i++] : unsorted[j++];
+    
+    if(i == middle)
+        while(j <= right)
+            tmp[k++] = unsorted[j++];
+    else
+        while(i < middle)
+            tmp[k++] = unsorted[i++];
+
+    for(k = left; k <= right; k++)
+        unsorted[k] = tmp[k - left];
+}
+
+void mergeSort(int unsorted[], int tmp[], int left, int right) {
+    int middle = (left + right) / 2;
+
+    if(right <= left)
+        return;
+
+    mergeSort(unsorted, tmp, left, middle);
+    mergeSort(unsorted, tmp, middle + 1, right);
+
+    merge(unsorted, tmp, left, middle + 1, right);
+}
+
+void mergeAlphabetical(char** unsorted, char** tmp, int left, int middle, int right) {
+    int i = left, j = middle, k = ZERO;
+    
+    while(i < middle && j <= right)
+        tmp[k++] = strcmp(unsorted[i], unsorted[j]) < 0 ? unsorted[i++] : unsorted[j++];
+    
+    if(i == middle)
+        while(j <= right)
+            tmp[k++] = unsorted[j++];
+    else
+        while(i < middle)
+            tmp[k++] = unsorted[i++];
+
+    for(k = left; k <= right; k++)
+        unsorted[k] = tmp[k - left];
+}
+
+void mergeSortAlphabetical(char** unsorted, char** tmp, int left, int right) {
+    int middle = (left + right) / 2;
+
+    if(right <= left)
+        return;
+
+    mergeSortAlphabetical(unsorted, tmp, left, middle);
+    mergeSortAlphabetical(unsorted, tmp, middle + 1, right);
+
+    mergeAlphabetical(unsorted, tmp, left, middle + 1, right);
+}
+
+int* getSortedTasks() {
+    int* ids = (int*) malloc(task_count * sizeof(int));
+    char **unsorted = (char**) malloc(task_count * sizeof(char*)), **tmp = (char**) malloc(task_count * sizeof(char*));
+    int i, j;
+
+    for(i = ZERO; i < task_count; i++){
+        unsorted[i] = (char*) malloc(TASK_DESCRIPTION * sizeof(char));
+        tmp[i] = (char*) malloc(TASK_DESCRIPTION * sizeof(char));
+        strcpy(unsorted[i], manager.tasks[i].description);
+    }
+
+    mergeSortAlphabetical(unsorted, tmp, ZERO, task_count - 1);
+
+    for(i = ZERO; i < task_count; i++) {
+        for(j = ZERO; j < task_count; j++) {
+            if(strcmp(unsorted[i], manager.tasks[j].description) == ZERO) {
+                ids[i] = manager.tasks[j].id;
+            }
+        }
+    }
+
+    for(i = ZERO; i < task_count; i++)
+        free(unsorted[i]);
+    free(unsorted);
+
+    return ids;
+}
+
 /*
 printTasks: int*, int ->
     prints all tasks associated with
@@ -135,11 +221,11 @@ void printTasks(int* ids, int id_count) {
     int i = ZERO;
 
     if(id_count == ZERO) {
-        /*TODO: IMPLEMENT SORTING*/
+        printTasks(getSortedTasks(), task_count);
     }
     else {
         while(i < id_count) {
-            task = manager.tasks[ids[i++]];
+            task = manager.tasks[ids[i++] - 1];
             printf("%d %s #%d %s\n", task.id, task.activity.name, task.duration, task.description);
         }
     }
@@ -213,35 +299,6 @@ int taskExists(int id) {
     return FALSE;
 }
 
-void merge(int unsorted[], int tmp[], int left, int middle, int right) {
-    int i = left, j = middle, k = ZERO;
-    
-    while(i < middle && j <= right)
-        tmp[k++] = unsorted[i] < unsorted[j] ? unsorted[i++] : unsorted[j++];
-    
-    if(i == middle)
-        while(j <= right)
-            tmp[k++] = unsorted[j++];
-    else
-        while(i < middle)
-            tmp[k++] = unsorted[i++];
-
-    for(k = left; k <= right; k++)
-        unsorted[k] = tmp[k - left];
-}
-
-void mergeSort(int unsorted[], int tmp[], int left, int right) {
-    int middle = (left + right) / 2;
-
-    if(right <= left)
-        return;
-
-    mergeSort(unsorted, tmp, left, middle);
-    mergeSort(unsorted, tmp, middle + 1, right);
-
-    merge(unsorted, tmp, left, middle + 1, right);
-}
-
 
 /*---MAIN FUNCTIONS---*/
 
@@ -303,7 +360,7 @@ void listTasks(char* input) {
             if(isNumerical(token) == FALSE || (id = atoi(token)) > task_count) {
                 ERROR("%s: no such task\n", token);
             }
-            ids[i++] = id - 1;
+            ids[i++] = id;
         }
         printTasks(ids, i);
     }
@@ -524,15 +581,9 @@ main: -> int
     finalizes when user enters the QUIT command
 */
 int main() {
-    int i = 0;
-    int array[30] = {1, 3, 5, 7, 9, 2, 4, 6, 8, 10, 1, 42, 199, 41, 4, 3, 6, 10 , 19, 20, 21, 22, 23, 24, 66, 53, 713, 512, 57, 12};
-    int tmp[30];
-    mergeSort(array, tmp, 0, 29);
-    while(i < 30)
-        printf("%d\n", array[i++]);
-    /*init(); 
+    init(); 
     while(parseInput() != QUIT)
-        ;*/
+        ;
     
     return ZERO;
 }
