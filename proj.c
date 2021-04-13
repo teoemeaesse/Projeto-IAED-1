@@ -26,22 +26,28 @@
 #define ACTIVITY_NAME 20
 #define ACTIVITY_MAX 10
 
-#define ERROR(S, O) printf(S, O); return
+/*---DEFINE MACROS---*/
 
+#define ID_TO_INDEX(ID) ID - 1
+#define IS_NUMERICAL(C) (C >= '0' && C <= '9')
+#define IS_UPPERCASE(C) (C >= 'A' && C <= 'Z')
+
+#define ERROR(S, O) printf(S, O); return
+#define MALLOC(S, T) (T*) malloc(S * sizeof(T))
 
 /*---DEFINE STRUCTS---*/
 
 typedef struct {
-    char name[USER_NAME];
+    char name[USER_NAME + 1];
 } User;
 
 typedef struct {
-    char name[ACTIVITY_NAME];
+    char name[ACTIVITY_NAME + 1];
 } Activity;
 
 typedef struct {
     int id, duration, start;
-    char description[TASK_DESCRIPTION];
+    char description[TASK_DESCRIPTION + 1];
     User user;
     Activity activity;
 } Task;
@@ -53,6 +59,16 @@ typedef struct {
     Task tasks[TASK_MAX];
 } Manager;
 
+typedef union {
+    char* string;
+    int integer;
+} Comparable;
+
+typedef struct {
+    Comparable* elements;
+} Sortable;
+
+typedef int (*CompareFunction)(Comparable, Comparable);
 
 /*---DEFINE ENUMS---*/
 
@@ -81,7 +97,7 @@ int isNumerical(char* string) {
     char c;
     
     while((c = string[i++]) != NULL_CHARACTER)
-        if(c < '0' || c > '9')
+        if(!IS_NUMERICAL(c))
             return FALSE;
     return TRUE;
 }
@@ -97,7 +113,7 @@ int isUpperCase(char* string) {
     char c;
 
     while((c = string[i++]) != NULL_CHARACTER)
-        if(c != ' ' && (c < 'A' || c > 'Z'))
+        if(!IS_NUMERICAL(c) && (c != WHITESPACE && !IS_UPPERCASE(c)))
             return FALSE;
     return TRUE;
 }
@@ -110,13 +126,13 @@ nextToken: char* -> char*
     trailing whitespace from the provided string
 */
 char* nextToken(char* input) {
-    char* token = (char*) malloc(COMMAND_SIZE * sizeof(char));
+    char* token = MALLOC(COMMAND_SIZE, char);
     char c;
     int i = ZERO, j = ZERO;
 
     while((c = input[i]) != WHITESPACE && c != NULL_CHARACTER)
         token[i++] = c;
-    if(c == WHITESPACE)
+    while((c = input[i]) == WHITESPACE)
         i++;
     while((c = input[i++]) != NULL_CHARACTER)
         input[j++] = c;
@@ -125,90 +141,106 @@ char* nextToken(char* input) {
     return token;
 }
 
-void merge(int unsorted[], int tmp[], int left, int middle, int right) {
+int compareIntegers(Comparable n1, Comparable n2) {
+    return n1.integer < n2.integer;
+}
+
+int compareStrings(Comparable s1, Comparable s2) {
+    return strcmp(s1.string, s2.string) < ZERO;
+}
+
+void merge(CompareFunction compare, Sortable unsorted, Sortable aux, int left, int middle, int right) {
     int i = left, j = middle, k = ZERO;
     
     while(i < middle && j <= right)
-        tmp[k++] = unsorted[i] < unsorted[j] ? unsorted[i++] : unsorted[j++];
+        aux.elements[k++] = compare(unsorted.elements[i], unsorted.elements[j]) ? unsorted.elements[i++] : unsorted.elements[j++];
     
     if(i == middle)
         while(j <= right)
-            tmp[k++] = unsorted[j++];
+            aux.elements[k++] = unsorted.elements[j++];
     else
         while(i < middle)
-            tmp[k++] = unsorted[i++];
+            aux.elements[k++] = unsorted.elements[i++];
 
     for(k = left; k <= right; k++)
-        unsorted[k] = tmp[k - left];
+        unsorted.elements[k] = aux.elements[k - left];
 }
 
-void mergeSort(int unsorted[], int tmp[], int left, int right) {
+void mergeSort(CompareFunction compare, Sortable unsorted, Sortable aux, int left, int right) {
     int middle = (left + right) / 2;
 
     if(right <= left)
         return;
 
-    mergeSort(unsorted, tmp, left, middle);
-    mergeSort(unsorted, tmp, middle + 1, right);
+    mergeSort(compare, unsorted, aux, left, middle);
+    mergeSort(compare, unsorted, aux, middle + 1, right);
 
-    merge(unsorted, tmp, left, middle + 1, right);
-}
-
-void mergeAlphabetical(char** unsorted, char** tmp, int left, int middle, int right) {
-    int i = left, j = middle, k = ZERO;
-    
-    while(i < middle && j <= right)
-        tmp[k++] = strcmp(unsorted[i], unsorted[j]) < 0 ? unsorted[i++] : unsorted[j++];
-    
-    if(i == middle)
-        while(j <= right)
-            tmp[k++] = unsorted[j++];
-    else
-        while(i < middle)
-            tmp[k++] = unsorted[i++];
-
-    for(k = left; k <= right; k++)
-        unsorted[k] = tmp[k - left];
-}
-
-void mergeSortAlphabetical(char** unsorted, char** tmp, int left, int right) {
-    int middle = (left + right) / 2;
-
-    if(right <= left)
-        return;
-
-    mergeSortAlphabetical(unsorted, tmp, left, middle);
-    mergeSortAlphabetical(unsorted, tmp, middle + 1, right);
-
-    mergeAlphabetical(unsorted, tmp, left, middle + 1, right);
+    merge(compare, unsorted, aux, left, middle + 1, right);
 }
 
 int* getSortedTasks() {
-    int* ids = (int*) malloc(task_count * sizeof(int));
-    char **unsorted = (char**) malloc(task_count * sizeof(char*)), **tmp = (char**) malloc(task_count * sizeof(char*));
+    int* ids = MALLOC(task_count, int);
     int i, j;
+    Sortable descriptions, aux;
+    descriptions.elements = MALLOC(task_count, Comparable);
+    aux.elements = MALLOC(task_count, Comparable);
 
     for(i = ZERO; i < task_count; i++){
-        unsorted[i] = (char*) malloc(TASK_DESCRIPTION * sizeof(char));
-        tmp[i] = (char*) malloc(TASK_DESCRIPTION * sizeof(char));
-        strcpy(unsorted[i], manager.tasks[i].description);
+        descriptions.elements[i].string = MALLOC(TASK_DESCRIPTION, char);
+        aux.elements[i].string = MALLOC(TASK_DESCRIPTION, char);
+        strcpy(descriptions.elements[i].string, manager.tasks[i].description);
     }
 
-    mergeSortAlphabetical(unsorted, tmp, ZERO, task_count - 1);
+    mergeSort(*compareStrings, descriptions, aux, ZERO, task_count - 1);
+
+    for(i = ZERO; i < task_count; i++)
+        for(j = ZERO; j < task_count; j++)
+            if(strcmp(descriptions.elements[i].string, manager.tasks[j].description) == ZERO)
+                ids[i] = manager.tasks[j].id;
 
     for(i = ZERO; i < task_count; i++) {
-        for(j = ZERO; j < task_count; j++) {
-            if(strcmp(unsorted[i], manager.tasks[j].description) == ZERO) {
-                ids[i] = manager.tasks[j].id;
-            }
+        free(descriptions.elements[i].string);
+    }
+    free(descriptions.elements);
+
+    return ids;
+}
+
+void printTasksInActivity(char activity_name[]) {
+    Sortable start_times, sorted;
+    int *ids = getSortedTasks();
+    int i, j, count = ZERO;
+
+    for(i = ZERO, j = ZERO; i < task_count; i++) {
+        if(strcmp(manager.tasks[ID_TO_INDEX(ids[i])].activity.name, activity_name) == ZERO) {
+            ids[j++] = ids[i];
+            count++;
         }
     }
 
-    for(i = ZERO; i < task_count; i++)
-        free(unsorted[i]);
-    free(unsorted);
+    start_times.elements = MALLOC(count, Comparable);
+    sorted.elements = MALLOC(count, Comparable);
+    for(i = ZERO; i < count; i++)
+        start_times.elements[i].integer = manager.tasks[ID_TO_INDEX(ids[i])].start;
 
-    return ids;
+    mergeSort(*compareIntegers, start_times, sorted, ZERO, count - 1);
+
+    for(i = ZERO; i < count; i++) {
+        for(j = ZERO; j < count; j++) {
+            if(ids[j] != QUIT && start_times.elements[i].integer == manager.tasks[ID_TO_INDEX(ids[j])].start) {
+                sorted.elements[i].integer = ids[j];
+                ids[j] = QUIT;
+                break;
+            }
+        }
+    }
+    
+    for(i = ZERO; i < count; i++)
+        printf("%d %d %s\n", sorted.elements[i].integer, start_times.elements[i].integer, manager.tasks[ID_TO_INDEX(sorted.elements[i].integer)].description);
+
+    free(ids);
+    free(start_times.elements);
+    free(sorted.elements);
 }
 
 /*
@@ -313,12 +345,14 @@ void addTask(char* input) {
     char* token;
 
     token = nextToken(input);
-    if(strlen(token) == ZERO || isNumerical(token) == FALSE) {
+    if(strlen(token) == ZERO || !isNumerical(token)) {
         ERROR("%s\n", "invalid duration");
     }
     duration = atoi(token);
     free(token);
 
+    if(strlen(input) == ZERO || strlen(input) > TASK_DESCRIPTION)
+        return;
     strcpy(description, input);
 
     for(i = ZERO; i < task_count; i++) {
@@ -352,20 +386,21 @@ void listTasks(char* input) {
     char* token;
     int* ids;
 
+    if(task_count == 0)
+        return;
+
     if(sizeof(input) == ZERO)
         printTasks(NULL, TASK_MAX);
     else {
-        ids = (int*) malloc(TASK_MAX * sizeof(int));
+        ids = MALLOC(TASK_MAX, int);
         while(strlen(token = nextToken(input)) != ZERO) {
-            if(isNumerical(token) == FALSE || (id = atoi(token)) > task_count) {
+            if(!isNumerical(token) || (id = atoi(token)) > task_count) {
                 ERROR("%s: no such task\n", token);
             }
             ids[i++] = id;
         }
         printTasks(ids, i);
     }
-
-    free(token);
 }
 
 /*
@@ -378,7 +413,7 @@ void clockStep(char* input) {
     char* token;
     int delta;
 
-    if(isNumerical(token = nextToken(input)) == FALSE) {
+    if(!isNumerical(token = nextToken(input))) {
         free(token);
         ERROR("%s\n", "invalid time");
     }
@@ -397,7 +432,7 @@ addUser: char* ->
     lists all users
 */
 void addUser(char* input) {
-    char* token;
+    char *token, *original = MALLOC(strlen(input), char);
     User user;
 
     if(strlen(input) == ZERO) {
@@ -405,18 +440,26 @@ void addUser(char* input) {
         return;
     }
 
-    token = nextToken(input);
-    
-    strcpy(user.name, token);
-    free(token);
+    strcpy(original, input);
 
-    if(userExists(user.name) == TRUE) {
+    token = nextToken(input);
+
+    if(userExists(token)) {
         ERROR("%s\n", "user already exists");
     }
-        
+
     if(user_count == USER_MAX) {
         ERROR("%s\n", "too many users");
     }
+
+    if(strlen(original) > USER_NAME)
+        return;
+
+    strcpy(user.name, token);
+
+    if((strlen(original) != ZERO && strcmp(user.name, original) != ZERO))
+        return;
+    free(token);
 
     manager.users[user_count++] = user;
 }
@@ -431,11 +474,11 @@ void moveTask(char* input) {
     char* token;
     char user_name[USER_NAME], activity_name[ACTIVITY_NAME];
 
-    if(isNumerical(token = nextToken(input)) == FALSE || taskExists(id = atoi(token)) == FALSE) {
+    if(!isNumerical(token = nextToken(input)) || !taskExists(id = atoi(token))) {
         ERROR("%s\n", "no such task");
     }
     
-    if(userExists(token = nextToken(input)) == FALSE) {
+    if(!userExists(token = nextToken(input))) {
         ERROR("%s\n", "no such user");
     }
     strcpy(user_name, token);
@@ -443,7 +486,7 @@ void moveTask(char* input) {
 
     strcpy(activity_name, input);
 
-    if(activityExists(activity_name) == FALSE) {
+    if(!activityExists(activity_name)) {
         ERROR("%s\n", "no such activity");
     }
     if(strcmp(activity_name, TO_DO.name) == ZERO) {
@@ -472,18 +515,14 @@ listTasksInActivity: char* ->
     with a given activity
 */
 void listTasksInActivity(char* input) {
-    int i;
     char activity_name[ACTIVITY_NAME];
 
     strcpy(activity_name, input);
-    if(activityExists(activity_name) == FALSE) {
+    if(!activityExists(activity_name)) {
         ERROR("%s\n", "no such activity");
     }
 
-    /*TODO: SORT*/
-    for(i = ZERO; i < task_count; i++)
-        if(strcmp(manager.tasks[i].activity.name, activity_name) == ZERO)
-            printf("%d %d %s\n", manager.tasks[i].id, manager.tasks[i].start, manager.tasks[i].description);
+    printTasksInActivity(activity_name);
 }
 
 /*
@@ -498,21 +537,24 @@ void addActivity(char* input) {
         return;
     }
 
+    if(strlen(input) > ACTIVITY_NAME)
+        return;
+
     strcpy(activity_name, input);
 
     if(activity_count == ACTIVITY_MAX) {
         ERROR("%s\n", "too many activities");   
     }
 
-    if(activityExists(activity_name) == TRUE) {
+    if(activityExists(activity_name)) {
         ERROR("%s\n", "duplicate activity");
     }
 
-    if(isUpperCase(activity_name) == FALSE) {
+    if(!isUpperCase(activity_name)) {
         ERROR("%s\n", "invalid description");
     }
 
-    strcpy(manager.activities[activity_count++].name, activity_name); 
+    strcpy(manager.activities[activity_count++].name, activity_name);
 }
 
 /*
